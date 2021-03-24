@@ -30,8 +30,8 @@ architecture lcd_write_arq of lcd_write is
     type state_t is (IDLE, SEND_CMD, SEND_DATA, WAIT_EN);
     signal state, next_state : state_t;
 
-    signal clk_count      : integer; --event counter for timing
-    signal next_clk_count : integer; --event counter for timing
+    signal clk_count      : integer := 0;
+    signal next_clk_count : integer;
     signal next_data_out  : std_logic_vector(7 downto 0);
     signal next_busy      : std_logic;
 
@@ -74,6 +74,7 @@ architecture lcd_write_arq of lcd_write is
             next_data_out <= "00000000";
             next_clk_count <= 0;
             next_busy <= '0';
+            next_state <= state;
 
             case state is
                 when IDLE =>

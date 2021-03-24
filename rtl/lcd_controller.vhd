@@ -86,8 +86,8 @@ architecture lcd_controller_arq of lcd_controller is
     type state_t is (POWER_UP, INIT_1, INIT_2, INIT_3, FUNCTIONSET, DISPLAYCONTROL, LCD_CLEAR, ENTRYMODESET, WAITING, READY);
     signal state, next_state, save_next_state, next_save_next_state : state_t;
 
-    signal clk_count : integer; --event counter for timing
-    signal next_clk_count : integer; --event counter for timing
+    signal clk_count : integer := 0;
+    signal next_clk_count : integer;
 
     signal next_busy  : std_logic;
     signal cmd        : std_logic;
