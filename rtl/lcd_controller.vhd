@@ -9,8 +9,8 @@ use IEEE.numeric_std.all;
 
 entity lcd_controller is
     generic (
-        --DATA_WIDTH  : integer := 8,   -- 8bits or 4bits
-        FREQ        : integer := 1    -- system clock frequency in MHz
+        MODE_8_BITS  : std_logic := '1'; -- 8-bits or 4-bits
+        FREQ         : integer   := 1    -- system clock frequency in MHz
     );
     port (
         clk         : in std_logic;                      --system clock
@@ -68,12 +68,13 @@ architecture lcd_controller_arq of lcd_controller is
 
     component lcd_write is
         generic (
-            FREQ        : integer := 1 --system clock frequency in MHz
+            FREQ         : integer := 1
         );
         port (
             clk         : in std_logic;
             rst         : in std_logic;
             cmd         : in std_logic;
+            mode_8_bits : in std_logic;
             new_data    : in std_logic;
             data_in     : in std_logic_vector(7 downto 0);
             busy        : out std_logic;
@@ -83,7 +84,7 @@ architecture lcd_controller_arq of lcd_controller is
     end component;
 
     --state machine
-    type state_t is (POWER_UP, INIT_1, INIT_2, INIT_3, FUNCTIONSET, DISPLAYCONTROL, LCD_CLEAR, ENTRYMODESET, WAITING, READY);
+    type state_t is (POWER_UP, INIT_1, INIT_2, INIT_3, FUNCTIONSET_4_BITS, FUNCTIONSET, DISPLAYCONTROL, LCD_CLEAR, ENTRYMODESET, WAITING, READY);
     signal state, next_state, save_next_state, next_save_next_state : state_t;
 
     signal clk_count : integer := 0;
@@ -95,6 +96,7 @@ architecture lcd_controller_arq of lcd_controller is
     signal data_in_i  : std_logic_vector(7 downto 0);
     signal busy_i     : std_logic;
     signal busy_r     : std_logic;
+    signal mode_8_bits_int : std_logic;
 
     begin
         registros: process(clk, rst)
@@ -115,7 +117,15 @@ architecture lcd_controller_arq of lcd_controller is
         end process;
 
         busy <= busy_r or busy_i; -- get one extra clk
-
+ 
+        mode_8_bits_int <= '1' when (next_save_next_state = POWER_UP) or
+                                    (next_save_next_state = INIT_1) or
+                                    (next_save_next_state = INIT_2) or
+                                    (next_save_next_state = INIT_3) or
+                                    (next_save_next_state = FUNCTIONSET_4_BITS) or
+                                    (next_save_next_state = FUNCTIONSET) else
+                                    MODE_8_BITS;
+                                    
         process(state, clk_count, new_data, data_in, busy_i, save_next_state)
         begin
             next_state <= state;
@@ -156,12 +166,26 @@ architecture lcd_controller_arq of lcd_controller is
                 when INIT_3 =>
                     -- Initializing by Instruction
                     -- Function set - 8 bit mode
-                    next_save_next_state <= FUNCTIONSET;
+                    if MODE_8_BITS = '1' then
+                        next_save_next_state <= FUNCTIONSET;
+                    else
+                        next_save_next_state <= FUNCTIONSET_4_BITS;
+                    end if;
                     next_clk_count <= LCD_CMD_WAIT_US;
                     next_busy <= '1';
                     cmd <= '1';
                     new_data_i <= '1';
                     data_in_i <= LCD_FUNCTIONSET or LCD_8BITMODE;
+                    next_state <= WAITING;
+                when FUNCTIONSET_4_BITS =>
+                    -- Initializing by Instruction
+                    -- Exclusive for 4-bits mode
+                    next_save_next_state <= FUNCTIONSET;
+                    next_clk_count <= LCD_CMD_WAIT_US;
+                    next_busy <= '1';
+                    cmd <= '1';
+                    new_data_i <= '1';
+                    data_in_i <= LCD_FUNCTIONSET;
                     next_state <= WAITING;
                 when FUNCTIONSET =>
                     -- Initializing by Instruction
@@ -171,7 +195,11 @@ architecture lcd_controller_arq of lcd_controller is
                     next_busy <= '1';
                     cmd <= '1';
                     new_data_i <= '1';
-                    data_in_i <= LCD_FUNCTIONSET or LCD_8BITMODE or LCD_2LINE;
+                    if MODE_8_BITS = '1' then
+                        data_in_i <= LCD_FUNCTIONSET or LCD_8BITMODE or LCD_2LINE;
+                    else
+                        data_in_i <= LCD_FUNCTIONSET or LCD_4BITMODE or LCD_2LINE;
+                    end if;
                     next_state <= WAITING;
                 when DISPLAYCONTROL =>
                     -- Initializing by Instruction
@@ -181,7 +209,7 @@ architecture lcd_controller_arq of lcd_controller is
                     next_busy <= '1';
                     cmd <= '1';
                     new_data_i <= '1';
-                    data_in_i <= LCD_DISPLAYCONTROL or LCD_8BITMODE or LCD_2LINE;
+                    data_in_i <= LCD_DISPLAYCONTROL or LCD_DISPLAYON or LCD_CURSORON;
                     next_state <= WAITING;
                 when LCD_CLEAR =>
                     -- Initializing by Instruction
@@ -236,6 +264,7 @@ architecture lcd_controller_arq of lcd_controller is
             clk      => clk,
             rst      => rst,
             cmd      => cmd,
+            mode_8_bits => mode_8_bits_int,
             new_data => new_data_i,
             data_in  => data_in_i,
             busy     => busy_i,

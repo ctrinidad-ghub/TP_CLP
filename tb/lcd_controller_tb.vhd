@@ -6,9 +6,10 @@ end;
 
 architecture lcd_controller_tb_arq of lcd_controller_tb is
 
-	 component lcd_controller is
+	component lcd_controller is
         generic (
-            FREQ        : integer := 1 --system clock frequency in MHz
+            MODE_8_BITS  : std_logic := '1';
+            FREQ         : integer := 1
         );
         port (
             clk         : in std_logic;
@@ -19,10 +20,21 @@ architecture lcd_controller_tb_arq of lcd_controller_tb is
             rw, rs, en  : out std_logic;
             data_out    : out std_logic_vector(7 downto 0)
         );
-	 end component;
+	end component;
+
+
+	component rst_synch is
+        port(
+            clk         : in std_logic;
+            ext_rst     : in std_logic;
+            pll_locked  : in std_logic;
+            int_rst     : out std_logic
+        );
+    end component;
 
     signal clk         : std_logic := '0';
-    signal rst         : std_logic := '1';
+    signal rst, ext_rst: std_logic := '1';
+    signal pll_locked  : std_logic := '0';
     signal new_data    : std_logic;
     signal data_in     : std_logic_vector(7 downto 0);
     signal busy        : std_logic;
@@ -31,15 +43,25 @@ architecture lcd_controller_tb_arq of lcd_controller_tb is
     signal ena         : std_logic := '0';
 begin
 
-	rst <= '1' after 10 ns, '0' after 20 ns;
+	ext_rst <= '1' after 10 ns, '0' after 200 ns;
+    pll_locked <= '0' after 10 ns, '1' after 1000 ns;
     clk <=  '1' after 500 ns when clk = '0' else
             '0' after 500 ns when clk = '1';
             -- not clk after 10 ns;
     ena <= '0' after 10 ns, '1' after 50 ns;
 	
+    u_rst : rst_synch
+        port map (
+			clk => clk,
+			ext_rst => ext_rst,
+            pll_locked => pll_locked,
+            int_rst => rst
+        );
+
     DUT: lcd_controller
         generic map (
-            FREQ => 1 -- system clock frequency in MHz
+            MODE_8_BITS => '0',
+            FREQ => 1           -- clk = 1Mhz
         )
 		port map (
 			clk => clk,
