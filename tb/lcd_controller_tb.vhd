@@ -16,6 +16,9 @@ architecture lcd_controller_tb_arq of lcd_controller_tb is
             rst         : in std_logic;
             new_data    : in std_logic;
             data_in     : in std_logic_vector(7 downto 0);
+            new_goto    : in std_logic;
+            column      : in std_logic_vector(4 downto 0);
+            row         : in std_logic_vector(1 downto 0);
             busy        : out std_logic;
             rw, rs, en  : out std_logic;
             data_out    : out std_logic_vector(7 downto 0)
@@ -41,6 +44,9 @@ architecture lcd_controller_tb_arq of lcd_controller_tb is
     signal rw, rs, en  : std_logic;
     signal data_out    : std_logic_vector(7 downto 0);
     signal ena         : std_logic := '0';
+    signal new_goto    : std_logic := '0';
+    signal column      : std_logic_vector(4 downto 0);
+    signal row         : std_logic_vector(1 downto 0);
 begin
 
 	ext_rst <= '1' after 10 ns, '0' after 200 ns;
@@ -50,6 +56,11 @@ begin
             -- not clk after 10 ns;
     ena <= '0' after 10 ns, '1' after 50 ns;
 	
+    -- cursor positioning
+    new_goto <= '0' after 0 ns, '1' after 53000 us, '0' after 53001 us;
+    column <= "00010";
+    row <= "11";
+
     u_rst : rst_synch
         port map (
 			clk => clk,
@@ -67,7 +78,10 @@ begin
 			clk => clk,
 			rst => rst,
             new_data => new_data,
-            data_in  => data_in,
+            data_in => data_in,
+            new_goto => new_goto,
+            column => column,
+            row  => row,
             busy => busy,
             rw => rw,
             rs => rs,

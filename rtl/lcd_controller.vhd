@@ -10,6 +10,8 @@ use IEEE.numeric_std.all;
 entity lcd_controller is
     generic (
         MODE_8_BITS  : std_logic := '1'; -- 8-bits or 4-bits
+        LCD_COLUMNS  : std_logic_vector(4 downto 0) := "10100"; -- 20
+        LCD_ROWS     : std_logic_vector(1 downto 0) := "11";    -- 4
         FREQ         : integer   := 1    -- system clock frequency in MHz
     );
     port (
@@ -17,6 +19,9 @@ entity lcd_controller is
         rst         : in std_logic;                      --reset
         new_data    : in std_logic;                      --new data_in valid
         data_in     : in std_logic_vector(7 downto 0);   --data
+        new_goto    : in std_logic;                      --new column and row valid
+        column      : in std_logic_vector(4 downto 0);   -- characters in a row
+        row         : in std_logic_vector(1 downto 0);   -- row number
         busy        : out std_logic;                     --lcd controller busy
         rw, rs, en  : out std_logic;                     --read/write, setup/data, and enable for lcd
         data_out    : out std_logic_vector(7 downto 0)); --data output to LCD
@@ -97,6 +102,7 @@ architecture lcd_controller_arq of lcd_controller is
     signal busy_i     : std_logic;
     signal busy_r     : std_logic;
     signal mode_8_bits_int : std_logic;
+    signal firstCharAdress : std_logic_vector(7 downto 0);
 
     begin
         registros: process(clk, rst)
@@ -125,8 +131,13 @@ architecture lcd_controller_arq of lcd_controller is
                                     (next_save_next_state = FUNCTIONSET_4_BITS) or
                                     (next_save_next_state = FUNCTIONSET) else
                                     MODE_8_BITS;
-                                    
-        process(state, clk_count, new_data, data_in, busy_i, save_next_state)
+        
+        firstCharAdress <= x"00" when (row = "00") else
+                           x"40" when (row = "01") else
+                           "000" & LCD_COLUMNS when (row = "10") else
+                           x"40" or ("000" & LCD_COLUMNS);
+        
+        process(state, clk_count, new_data, data_in, new_goto, busy_i, save_next_state, firstCharAdress, column)
         begin
             next_state <= state;
             next_save_next_state <= save_next_state;
@@ -237,9 +248,17 @@ architecture lcd_controller_arq of lcd_controller is
                     end if;
                     next_save_next_state <= READY;
                     next_clk_count <= LCD_CMD_WAIT_US;
-                    new_data_i <= new_data;
-                    data_in_i <= data_in;
-                    cmd <= '0';
+                    new_data_i <= new_data or new_goto;
+                    if new_goto = '1' then
+                        data_in_i <= (LCD_SETDDRAMADDR or std_logic_vector(unsigned(firstCharAdress) + unsigned("000" & column)));
+                    else
+                        data_in_i <= data_in;
+                    end if;
+                    if new_goto = '1' then
+                        cmd <= '1';
+                    else
+                        cmd <= '0';
+                    end if;
                     next_busy <= busy_i;
                 when WAITING =>
                     next_busy <= '1';
