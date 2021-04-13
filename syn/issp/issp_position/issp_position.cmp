@@ -1,0 +1,6 @@
+	component issp_position is
+		port (
+			source : out std_logic_vector(6 downto 0)   -- source
+		);
+	end component issp_position;
+
