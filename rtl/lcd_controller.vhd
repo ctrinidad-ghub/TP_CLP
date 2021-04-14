@@ -243,7 +243,7 @@ architecture lcd_controller_arq of lcd_controller is
                     data_in_i <= LCD_ENTRYMODESET or LCD_ENTRYLEFT or LCD_ENTRYNOSHIFT;
                     next_state <= WAITING;
                 when READY =>
-                    if (new_data = '1') then
+                    if (new_data = '1' or new_goto = '1') then
                         next_state <= WAITING;
                     end if;
                     next_save_next_state <= READY;
